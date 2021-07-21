@@ -40,6 +40,7 @@ class SwimMaha:
         syntheticInstances  = []
         data_maj_orig       = data[np.where(labels!=self.minClass)[0], :]
         data_min_orig       = data[np.where(labels==self.minClass)[0], :]
+        data_min_orig = data_min_orig+0.00001*np.random.rand((data_min_orig.shape)[0],(data_min_orig.shape)[1])
 
         if(np.sum(labels==self.minClass)==1):
             data_min_orig = data_min_orig.reshape(1,len(data_min_orig))

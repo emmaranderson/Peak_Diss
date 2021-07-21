@@ -13,6 +13,7 @@ Original file is located at
 # phase 3: Synthesize new samples
 import numpy as np
 import time
+import pandas as pd
 
 class SingularMatrixException(Exception):
     def __init__(self):
@@ -28,28 +29,35 @@ class MAHAKIL(object):
     # Core method
     # return : data_new, label_new
     def fit_sample(self, data, label):
-        # data: sample array containing metric information
-        # label: sample label array
-        data_t, data_f, label_t, label_f = [], [], [], []
-        # Divide the data set according to positive examples and negative examples
-        for i in range(label.shape[0]):
-            if label[i] == 1:
-                data_t.append(data[i])
-                label_t.append(label[i])
-            if label[i] == 0:
-                data_f.append(data[i])
-                label_f.append(label[i])
+        
+        label = label.reset_index(drop=True)
+        data = data.reset_index(drop=True)
+        
+        label_f = np.array(label[label==0])
+        label_t = np.array(label[label==1])
+        
+        data_f = np.array(data[label==0])
+        data_t = np.array(data[label==1])
+        
+        data_t = data_t+0.00001*np.random.rand((data_t.shape)[0],(data_t.shape)[1])
+  
         self.T = len(data_f) / (1 - self.pfp) - len(data_f)
         self.data_t = np.array(data_t)
         print('sorted data')
         # Calculate the Mahalanobis distance
         d = self.mahalanobis_distance(self.data_t)
+        
+        d = pd.DataFrame (d,columns=['Malhabonis Distance'])
+        d = d.reset_index(drop=False)
+        d = d.values.tolist()
+        
         print('calculated distance')
         # Descending order
         d.sort(key=lambda x: x[1], reverse=True)
         # Divide the set of positive examples into two
         k = len(d)
         d_index = [d[i][0] for i in range(k)]
+        d_index = [ int(d) for d in d_index ]
         data_t_sorted = [data_t[i] for i in d_index]
         mid = int(k/2)
         bin1 = [data_t_sorted[i] for i in range(0, mid)]
@@ -71,30 +79,17 @@ class MAHAKIL(object):
         self.generate_new_sample(bin1, bin2, g, l_, k, is_full)
         # Return data and labels
         label_new = np.ones(len(self.new))
+        print(type(data))
         return np.append(data, self.new, axis=0), np.append(label, label_new, axis=0)
 
     def mahalanobis_distance(self, x):
-        # x: array
-        mu = np.mean(x, axis=0)  # Mean
-        d = []
-        for i in range(x.shape[0]):
-            x_mu = np.atleast_2d(x[i] - mu)
-            s = self.cov(x)
-            d_squre = np.dot(np.dot(x_mu, np.linalg.inv(s)), np.transpose(x_mu))[0][0]
-            d_tuple = (i, d_squre)
-            d.append(d_tuple)
-        return d
+        x_mu = x - np.mean(x)
+        cov = np.cov(x.T)
+        inv_covmat = np.linalg.inv(cov)
+        left = np.dot(x_mu, inv_covmat)
+        mahal = np.dot(left, x_mu.T).diagonal()
+        return mahal
 
-    @staticmethod
-    def cov(x):
-        # x: array
-        s = np.zeros((x.shape[1], x.shape[1]))
-        mu = np.mean(x, axis=0)  # Mean
-        for i in range(x.shape[0]):
-            x_xbr = np.atleast_2d(x - mu)
-            s_i = np.dot(np.transpose(x_xbr), x_xbr)
-            s = s + s_i
-        return np.divide(s, x.shape[0])
 
     # Generate new samples
     def generate_new_sample(self, bin1, bin2, g, l, k, is_full):
